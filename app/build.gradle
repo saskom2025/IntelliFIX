@@ -1,5 +1,6 @@
 
 plugins {
+    id 'java'
     id 'application'
 }
 
@@ -8,11 +9,16 @@ repositories {
 }
 
 dependencies {
-    testImplementation libs.junit.jupiter
+    implementation 'org.quickfixj:quickfixj-core:2.3.2'
+    implementation 'org.quickfixj:quickfixj-messages-fix44:2.3.2'
+    implementation 'redis.clients:jedis:5.1.0'
 
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    testCompileOnly 'org.projectlombok:lombok:1.18.34'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
 
-    implementation libs.guava
+    implementation 'ch.qos.logback:logback-classic:1.5.6'
 }
 
 java {
@@ -25,6 +31,36 @@ application {
     mainClass = 'org.intellifix.App'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+task runBroker(type: JavaExec) {
+    group = 'Execution'
+    description = 'Run FixBrokerSimulator'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.intellifix.fix.FixBrokerSimulator'
+    args = [
+            'src/main/resources/config/BrokerSimulator.cfg',
+            'src/main/resources/fix/spec/FIX44.xml',
+            'src/main/resources/logs/logs.txt'
+    ]
+}
+
+task runHub(type: JavaExec) {
+    group = 'Execution'
+    description = 'Run Hub'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.intellifix.fix.HubSimulator'
+    args = [
+            'src/main/resources/config/HubSimulator.cfg'
+    ]
+}
+
+task runClient(type: JavaExec) {
+    group = 'Execution'
+    description = 'Run FixClientSimulator'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.intellifix.fix.FixClientSimulator'
+    args = [
+            'src/main/resources/config/ClientSimulator.cfg',
+            'src/main/resources/fix/spec/FIX44.xml',
+            'src/main/resources/logs/logs.txt'
+    ]
 }

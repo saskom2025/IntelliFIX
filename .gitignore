@@ -7,3 +7,7 @@ build
 # Ignore IDE
 .idea/
 
+app/data_broker/
+app/data_client/
+app/data_hub/
+app/log/

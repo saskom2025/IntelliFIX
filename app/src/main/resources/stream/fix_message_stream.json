@@ -1,0 +1,6 @@
+{
+  "sim_id": "1001",
+  "session_id": "FIX.4.4:HUB->BROKER1",
+  "direction": "HUB->BROKER1",
+  "fix_message": "8=FIX.4.4|9=114|35=D|34=5|49=HUB|52=20260123-14:27:37.885|56=BROKER1|11=ORDER123|21=1|40=1|54=1|55=AAPL|59=0|60=20230101-10:00:00|10=188|"
+}
