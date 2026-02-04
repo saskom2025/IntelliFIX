@@ -5,14 +5,18 @@ import org.intellifix.redis.base.MessagePublisher;
 import quickfix.*;
 import quickfix.field.MsgType;
 
+import java.util.Random;
+
 @Slf4j
 public class HubApp extends MessageCracker implements Application {
+
     private volatile SessionID clientSession;
     private volatile SessionID brokerSession;
 
     private MessagePublisher messagePublisher;
     private final String clientCompID;
     private final String brokerCompID;
+    private final Random random = new Random();
 
     public HubApp(MessagePublisher messagePublisher, String clientCompID, String brokerCompID) {
         this.messagePublisher = messagePublisher;
@@ -56,6 +60,7 @@ public class HubApp extends MessageCracker implements Application {
 
     @Override
     public void toApp(Message message, SessionID sessionID) throws DoNotSend {
+
     }
 
     @Override
@@ -71,7 +76,10 @@ public class HubApp extends MessageCracker implements Application {
         if (sessionID.equals(clientSession)) {
             if (brokerSession != null) {
                 log.info("[HUB] Forwarding to Broker...session:" + brokerSession);
-                messagePublisher.publishMessage("[CLIENT->HUB] Received 35=" + msgType + " message " + pretty(message));
+                String tag526 = message.getString(11);
+
+                message.setString(526, tag526);
+                message.setString(11, getRunningNumber()); // tag11 will be a random 4-digit number from hub
                 forward(message, brokerSession);
             } else {
                 log.info("[HUB] WARN: Broker session not logged on. Cannot forward.");
@@ -79,7 +87,17 @@ public class HubApp extends MessageCracker implements Application {
         } else if (sessionID.equals(brokerSession)) {
             if (clientSession != null) {
                 log.info("[HUB] Forwarding to Client...session: " + clientSession);
-                messagePublisher.publishMessage("[BROKER->HUB] Received 35=" + msgType + " message " + pretty(message));
+
+                if (message.isSetField(526)) {
+                    String originalWithPrefix = message.getString(526);
+                    String originalClOrdID = originalWithPrefix;
+                    if (originalWithPrefix.contains("-")) {
+                        originalClOrdID = originalWithPrefix.substring(originalWithPrefix.lastIndexOf("-") + 1);
+                    }
+                    message.setString(11, originalClOrdID);
+                    message.removeField(526);
+                    log.info("[HUB] Restored tag 11 to " + originalClOrdID + " and removed tag 526");
+                }
                 forward(message, clientSession);
             } else {
                 log.info("[HUB] WARN: Client session not logged on. Cannot forward.");
@@ -101,5 +119,9 @@ public class HubApp extends MessageCracker implements Application {
 
     private String pretty(Message m) {
         return m.toString().replace('\u0001', '|');
+    }
+
+    private String getRunningNumber() {
+        return String.valueOf(1000 + random.nextInt(9000));
     }
 }

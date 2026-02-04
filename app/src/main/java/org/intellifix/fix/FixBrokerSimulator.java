@@ -6,6 +6,7 @@ import org.intellifix.fix.base.SimulatorEngine;
 import org.intellifix.redis.base.MessagePublisher;
 import org.intellifix.redis.RedisMessagePublisher;
 import quickfix.*;
+import quickfix.field.MsgType;
 import quickfix.field.SenderCompID;
 import quickfix.field.TargetCompID;
 import org.intellifix.fix.apps.BrokerApp;
@@ -25,12 +26,17 @@ public final class FixBrokerSimulator extends SimulatorEngine {
     }
 
     @Override
-    protected StepType determineStepType(String msgType) {
-        return switch (msgType) {
-            case "D", "G", "F" -> StepType.EXPECT_INBOUND;
-            case "8" -> StepType.OUTBOUND;
-            default -> null;
-        };
+    protected StepType determineStepType(Message message) {
+        try {
+            String msgType = message.getHeader().getString(MsgType.FIELD);
+            return switch (msgType) {
+                case "D", "G", "F" -> StepType.EXPECT_INBOUND;
+                case "8" -> StepType.OUTBOUND;
+                default -> null;
+            };
+        } catch (FieldNotFound e) {
+            return null;
+        }
     }
 
     @Override
@@ -38,6 +44,7 @@ public final class FixBrokerSimulator extends SimulatorEngine {
         for (Step step : steps) {
             switch (step) {
                 case Step(StepType type, Message message) when type == StepType.EXPECT_INBOUND -> {
+                    System.out.println("Broker Simulator -> EXPECT_INBOUND");
                     CountDownLatch latch = new CountDownLatch(1);
                     app.setExpectedInbound(message, latch);
                     // log.info("[WAIT] for inbound " + pretty(message));
@@ -48,6 +55,7 @@ public final class FixBrokerSimulator extends SimulatorEngine {
                     }
                 }
                 case Step(StepType type, Message message) when type == StepType.OUTBOUND -> {
+                    System.out.println("Broker Simulator -> OUTBOUND");
                     handleOutbound(message, sid);
                     // log.info("[OUT] " + pretty(message));
                     boolean isResponseOk = Session.sendToTarget(message, sid);
@@ -63,6 +71,8 @@ public final class FixBrokerSimulator extends SimulatorEngine {
 
     @Override
     protected void handleOutbound(Message out, SessionID sid) throws Exception {
+        System.out.println("#### Broker handleOutbound");
+        System.out.println("Message: "+out);
         if (!out.getHeader().isSetField(SenderCompID.FIELD)
                 || !out.getHeader().isSetField(TargetCompID.FIELD)) {
             out.getHeader().setString(SenderCompID.FIELD, sid.getSenderCompID());

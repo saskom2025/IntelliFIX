@@ -49,7 +49,9 @@ task runHub(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'org.intellifix.fix.HubSimulator'
     args = [
-            'src/main/resources/config/HubSimulator.cfg'
+            'src/main/resources/config/HubSimulator.cfg',
+            'src/main/resources/fix/spec/FIX44.xml',
+            'src/main/resources/logs/logs.txt'
     ]
 }
 
