@@ -49,6 +49,13 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
     }
 
     @Override
+    public Message updateTagEleven(Message message, String simId, String senderCompId, String tag) {
+        var updatedTagEleven = "%s-%s-%s".formatted(simId, senderCompId, tag);
+        message.setString(11, updatedTagEleven);
+        return message;
+    }
+
+    @Override
     public void onCreate(SessionID sessionID) {
         log.info("[CLIENT] onCreate: " + sessionID);
         this.activeSession = sessionID;
@@ -78,6 +85,21 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
 
     @Override
     public void toApp(Message message, SessionID sessionID) throws DoNotSend {
+
+        String msgType = null;
+        try {
+            msgType = message.getHeader().getString(MsgType.FIELD);
+        } catch (FieldNotFound e) {
+            throw new RuntimeException(e);
+        }
+
+        if (msgType.equals(MsgType.ORDER_SINGLE) || msgType.equals(MsgType.ORDER_CANCEL_REPLACE_REQUEST)
+                || msgType.equals(MsgType.ORDER_CANCEL_REQUEST)) {
+            updatedClientOrderIdForHub(message);
+        }
+
+        messagePublisher
+                .publishMessage("[SIMULATED] Client sent 35=" + msgType + " " + pretty(message));
     }
 
     @Override
@@ -85,7 +107,7 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
 
         String msgType = message.getHeader().getString(MsgType.FIELD);
-        messagePublisher.publishMessage("[HUB->CLIENT] Forwarding 35=" + msgType + " " + pretty(message));
+        messagePublisher.publishMessage("[SIMULATED] Client received 35=" + msgType + " " + pretty(message));
 
         Message expected = this.expectedInbound;
         CountDownLatch latch = this.expectedLatch;
@@ -95,11 +117,25 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
                 log.info("[MATCH] Expected inbound satisfied.");
                 latch.countDown();
             } else {
-                // Not a match; ignore and keep waiting
+                System.out.println("[NO_MATCH_FOUND]");
             }
         }
+        crack(message, sessionID);
+    }
 
-        // crack(message, sessionID);
+    private void updatedClientOrderIdForHub(Message message) {
+        String msgType = null;
+        String simId = "sim1";
+        try {
+            msgType = message.getHeader().getString(MsgType.FIELD);
+            String clientOrderID = message.getString(11);
+            String senderCompID = message.getHeader().getString(49);
+
+            updateTagEleven(message, simId, senderCompID, clientOrderID);
+
+        } catch (FieldNotFound e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void onMessage(ExecutionReport report, SessionID sessionID) {
@@ -108,8 +144,7 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
     /**
      * Matching strategy:
      * - Must match MsgType
-     * - If expected contains tags, verify those tags match in actual (common: 11,
-     * 41, 150, 39, 37, 17)
+     * - If expected contains tags, verify those tags match in actual (11)
      */
     private boolean matchesExpected(Message expected, Message actual) {
         try {
@@ -118,17 +153,26 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
             if (!expType.equals(actType))
                 return false;
 
+            // multiple tags can be added as comma separated values
             int[] mandatoryTags = new int[] {
-                    11, // ClOrdID
-                    41, // OrigClOrdID
-                    150, // ExecType
-                    39, // OrdStatus
-                    37, // OrderID
-                    17 // ExecID
+                    11
             };
 
             for (int tag : mandatoryTags) {
-                if (expected.isSetField(tag)) {
+                if (tag == 11) {
+                    String expectedVal11 = null;
+                    if (expected.isSetField(526)) {
+                        String val526 = expected.getString(526);
+                        expectedVal11 = val526.contains("-") ? val526.substring(val526.lastIndexOf("-") + 1) : val526;
+                    }
+
+                    if (expectedVal11 != null) {
+                        if (!actual.isSetField(11))
+                            return false;
+                        if (!expectedVal11.equals(actual.getString(11)))
+                            return false;
+                    }
+                } else if (expected.isSetField(tag)) {
                     if (!actual.isSetField(tag))
                         return false;
                     String ev = expected.getString(tag);
@@ -137,9 +181,7 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
                         return false;
                 }
             }
-
             return true;
-
         } catch (Exception e) {
             return false;
         }

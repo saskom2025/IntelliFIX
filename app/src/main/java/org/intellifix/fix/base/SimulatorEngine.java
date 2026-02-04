@@ -12,7 +12,7 @@ import java.util.List;
 @Slf4j
 public abstract class SimulatorEngine {
 
-    protected abstract StepType determineStepType(String msgType);
+    protected abstract StepType determineStepType(Message message);
 
     protected abstract void runScenario(List<Step> steps, SimulatorAppBase app, SessionID sid) throws Exception;
 
@@ -27,20 +27,27 @@ public abstract class SimulatorEngine {
                         return line.trim();
                     })
                     .filter(line -> !line.isEmpty() && !line.startsWith("#") && !line.startsWith("//"))
+                    // Handle new format: "1: 8=FIX..." -> strip "1: "
+                    .map(line -> line.replaceFirst("^\\d+:\\s*", ""))
                     .map(line -> (line.indexOf('\u0001') < 0 && line.contains("|")) ? line.replace('|', '\u0001')
                             : line)
                     .map(line -> {
                         try {
+                            // Ensure the message ends with SOH if not present
+                            if (!line.endsWith("\u0001")) {
+                                line += "\u0001";
+                            }
                             Message msg = new Message(line, dd, false);
-                            String msgType = msg.getHeader().getString(MsgType.FIELD);
-                            StepType type = determineStepType(msgType);
+                            StepType type = determineStepType(msg);
                             if (type != null) {
                                 return new Step(type, msg);
                             } else {
+                                String msgType = msg.getHeader().getString(MsgType.FIELD);
                                 log.info("[SKIP] line " + ln.get() + " msgType=" + msgType);
                                 return null;
                             }
                         } catch (Exception e) {
+                            log.error("Failed to parse line {}: {}", ln.get(), line, e);
                             throw new RuntimeException(e);
                         }
                     })

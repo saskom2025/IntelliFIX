@@ -8,6 +8,7 @@ import quickfix.*;
 
 @Slf4j
 public class HubSimulator {
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             log.error("Missing configuration file path");

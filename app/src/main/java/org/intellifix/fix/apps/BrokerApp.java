@@ -33,6 +33,11 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
         return activeSession;
     }
 
+    @Override
+    public Message updateTagEleven(Message message, String simId, String senderCompId, String tag) {
+        return null;
+    }
+
     public void setExpectedInbound(Message expected, CountDownLatch latch) {
         this.expectedInbound = expected;
         this.expectedLatch = latch;
@@ -73,6 +78,13 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
 
     @Override
     public void toApp(Message message, SessionID sessionID) throws DoNotSend {
+        String msgType = null;
+        try {
+            msgType = message.getHeader().getString(MsgType.FIELD);
+        } catch (FieldNotFound e) {
+            throw new RuntimeException(e);
+        }
+        messagePublisher.publishMessage("[SIMULATED] Broker sent 35=" + msgType + " " + pretty(message));
     }
 
     @Override
@@ -80,18 +92,49 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
 
         String msgType = message.getHeader().getString(MsgType.FIELD);
-        messagePublisher.publishMessage("[HUB->BROKER] Forwarding 35=" + msgType + " " + pretty(message));
+        messagePublisher.publishMessage("[SIMULATED] Broker received 35=" + msgType + " " + pretty(message));
         // Try to satisfy expected inbound (D/G/F) when waiting
         Message expected = this.expectedInbound;
         CountDownLatch latch = this.expectedLatch;
         if (expected != null && latch != null) {
+
             if (matchesExpected(expected, message)) {
                 System.out.println("[MATCH] Expected inbound satisfied.");
                 latch.countDown();
+            } else {
+                System.out.println("[NO_MATCH_FOUND]");
             }
         }
+        crack(message, sessionID);
+    }
 
-        // crack(message, sessionID);
+    public void onMessage(quickfix.fix44.NewOrderSingle order, SessionID sessionID)
+            throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue {
+        System.out.println("[BROKER] Received NewOrderSingle. Sending ExecutionReport...");
+
+        // Construct Execution Report using setters to avoid constructor signature
+        // issues
+        ExecutionReport execReport = new ExecutionReport();
+        execReport.set(new quickfix.field.OrderID("ORD" + System.currentTimeMillis()));
+        execReport.set(new quickfix.field.ExecID("EXEC" + System.currentTimeMillis()));
+        execReport.set(new quickfix.field.ExecType(quickfix.field.ExecType.NEW));
+        execReport.set(new quickfix.field.OrdStatus(quickfix.field.OrdStatus.NEW));
+        execReport.set(order.getSymbol());
+        execReport.set(order.getSide());
+        execReport.set(new quickfix.field.LeavesQty(order.getOrderQty().getValue()));
+        execReport.set(new quickfix.field.CumQty(0));
+        execReport.set(new quickfix.field.AvgPx(0));
+        execReport.set(order.getClOrdID());
+
+        if (order.isSetField(526)) {
+            execReport.setString(526, order.getString(526));
+        }
+
+        try {
+            Session.sendToTarget(execReport, sessionID);
+        } catch (SessionNotFound e) {
+            e.printStackTrace();
+        }
     }
 
     public void onMessage(ExecutionReport report, SessionID sessionID) {
@@ -107,25 +150,30 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
         try {
             String expType = expected.getHeader().getString(MsgType.FIELD);
             String actType = actual.getHeader().getString(MsgType.FIELD);
+
             if (!expType.equals(actType))
                 return false;
-
+            // multiple tags can be added as comma separated values
             int[] mandatoryTags = new int[] {
                     11, // ClOrdID
-                    41, // OrigClOrdID (for replace/cancel)
                     55, // Symbol
                     54 // Side
             };
 
             for (int tag : mandatoryTags) {
                 if (expected.isSetField(tag)) {
-                    if (!actual.isSetField(tag))
+                    String actualValue = null;
+                    if (tag == 11 && actual.isSetField(526)) {
+                        String val526 = actual.getString(526);
+                        actualValue = val526.contains("-") ? val526.substring(val526.lastIndexOf("-") + 1) : val526;
+                    } else if (actual.isSetField(tag)) {
+                        actualValue = actual.getString(tag);
+                    }
+                    if (actualValue == null || !expected.getString(tag).equals(actualValue)) {
                         return false;
-                    if (!expected.getString(tag).equals(actual.getString(tag)))
-                        return false;
+                    }
                 }
             }
-
             return true;
         } catch (Exception e) {
             return false;

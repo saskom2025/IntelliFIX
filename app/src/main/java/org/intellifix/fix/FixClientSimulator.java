@@ -8,6 +8,7 @@ import org.intellifix.redis.RedisMessagePublisher;
 import quickfix.*;
 import org.intellifix.fix.apps.ClientApp;
 import org.intellifix.fix.model.*;
+import quickfix.field.MsgType;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -23,12 +24,17 @@ public final class FixClientSimulator extends SimulatorEngine {
     }
 
     @Override
-    protected StepType determineStepType(String msgType) {
-        return switch (msgType) {
-            case "D", "G", "F" -> StepType.OUTBOUND;
-            case "8" -> StepType.EXPECT_INBOUND;
-            default -> null;
-        };
+    protected StepType determineStepType(Message message) {
+        try {
+            String msgType = message.getHeader().getString(MsgType.FIELD);
+            return switch (msgType) {
+                case "D", "G", "F" -> StepType.OUTBOUND;
+                case "8" -> StepType.EXPECT_INBOUND;
+                default -> null;
+            };
+        } catch (FieldNotFound e) {
+            return null;
+        }
     }
 
     @Override
@@ -36,14 +42,20 @@ public final class FixClientSimulator extends SimulatorEngine {
         for (Step step : steps) {
             switch (step) {
                 case Step(StepType type, Message message) when type == StepType.OUTBOUND -> {
-                    // handleOutbound(message, sid);
-                    boolean isResponseOk = Session.sendToTarget(message, sid);
-                    if (!isResponseOk) {
-                        throw new RuntimeException(
-                                "Failed to send message to target (Session.sendToTarget returned false)");
+                    // Filter: do not send if tag 526 is present
+                    if (message.isSetField(526)) {
+                        log.info("[SKIP] Message with 526=" + message.getString(526) + " ignored.");
+                    } else {
+                        // handleOutbound(message, sid);
+                        boolean isResponseOk = Session.sendToTarget(message, sid);
+                        if (!isResponseOk) {
+                            throw new RuntimeException(
+                                    "Failed to send message to target (Session.sendToTarget returned false)");
+                        }
                     }
                 }
                 case Step(StepType type, Message message) when type == StepType.EXPECT_INBOUND -> {
+                    System.out.println("Client Simulator -> EXPECT_INBOUND");
                     CountDownLatch latch = new CountDownLatch(1);
                     app.setExpectedInbound(message, latch);
                     // System.out.println("[WAIT] for inbound " + pretty(message));
