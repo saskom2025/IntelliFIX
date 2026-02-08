@@ -5,7 +5,6 @@ import quickfix.SessionID;
 import java.util.concurrent.CountDownLatch;
 
 public interface SimulatorAppBase {
-
     void awaitLogon(long timeoutSeconds) throws InterruptedException;
 
     void setExpectedInbound(Message expected, CountDownLatch latch);

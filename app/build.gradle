@@ -39,7 +39,7 @@ task runBroker(type: JavaExec) {
     args = [
             'src/main/resources/config/BrokerSimulator.cfg',
             'src/main/resources/fix/spec/FIX44.xml',
-            'src/main/resources/logs/logs.txt'
+            'src/main/resources/logs/log_new.txt'
     ]
 }
 
@@ -51,7 +51,7 @@ task runHub(type: JavaExec) {
     args = [
             'src/main/resources/config/HubSimulator.cfg',
             'src/main/resources/fix/spec/FIX44.xml',
-            'src/main/resources/logs/logs.txt'
+            'src/main/resources/logs/log_new.txt'
     ]
 }
 
@@ -63,6 +63,6 @@ task runClient(type: JavaExec) {
     args = [
             'src/main/resources/config/ClientSimulator.cfg',
             'src/main/resources/fix/spec/FIX44.xml',
-            'src/main/resources/logs/logs.txt'
+            'src/main/resources/logs/log_new.txt'
     ]
 }

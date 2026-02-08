@@ -9,6 +9,9 @@ import quickfix.*;
 @Slf4j
 public class HubSimulator {
 
+    private final static String CLIENT_COMP_ID = "ClientCompID";
+    private final static String BROKER_COMP_ID = "BrokerCompID";
+
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             log.error("Missing configuration file path");
@@ -20,8 +23,8 @@ public class HubSimulator {
         String configPath = args[0];
         SessionSettings settings = new SessionSettings(configPath);
 
-        String clientCompID = settings.getString("ClientCompID");
-        String brokerCompID = settings.getString("BrokerCompID");
+        String clientCompID = settings.getString(CLIENT_COMP_ID);
+        String brokerCompID = settings.getString(BROKER_COMP_ID);
 
         HubApp app = new HubApp(messagePublisher, clientCompID, brokerCompID);
 

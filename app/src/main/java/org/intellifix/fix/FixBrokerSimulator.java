@@ -31,7 +31,7 @@ public final class FixBrokerSimulator extends SimulatorEngine {
             String msgType = message.getHeader().getString(MsgType.FIELD);
             return switch (msgType) {
                 case "D", "G", "F" -> StepType.EXPECT_INBOUND;
-                case "8" -> StepType.OUTBOUND;
+                // case "8" -> StepType.OUTBOUND;
                 default -> null;
             };
         } catch (FieldNotFound e) {
@@ -47,7 +47,6 @@ public final class FixBrokerSimulator extends SimulatorEngine {
                     System.out.println("Broker Simulator -> EXPECT_INBOUND");
                     CountDownLatch latch = new CountDownLatch(1);
                     app.setExpectedInbound(message, latch);
-                    // log.info("[WAIT] for inbound " + pretty(message));
                     boolean isResponseOk = latch.await(120, TimeUnit.SECONDS);
                     app.clearExpectedInbound();
                     if (!isResponseOk) {
@@ -57,7 +56,6 @@ public final class FixBrokerSimulator extends SimulatorEngine {
                 case Step(StepType type, Message message) when type == StepType.OUTBOUND -> {
                     System.out.println("Broker Simulator -> OUTBOUND");
                     handleOutbound(message, sid);
-                    // log.info("[OUT] " + pretty(message));
                     boolean isResponseOk = Session.sendToTarget(message, sid);
                     if (!isResponseOk) {
                         throw new RuntimeException(
@@ -71,8 +69,6 @@ public final class FixBrokerSimulator extends SimulatorEngine {
 
     @Override
     protected void handleOutbound(Message out, SessionID sid) throws Exception {
-        System.out.println("#### Broker handleOutbound");
-        System.out.println("Message: "+out);
         if (!out.getHeader().isSetField(SenderCompID.FIELD)
                 || !out.getHeader().isSetField(TargetCompID.FIELD)) {
             out.getHeader().setString(SenderCompID.FIELD, sid.getSenderCompID());
@@ -106,7 +102,7 @@ public final class FixBrokerSimulator extends SimulatorEngine {
         if (sid == null)
             throw new RuntimeException("No active session");
 
-        List<Step> steps = instance.readSteps(args[2], dd);
+        List<Step> steps = instance.readSteps(args[2], dd, sid);
         instance.runScenario(steps, app, sid);
 
         log.info("[DONE] Scenario completed. Stopping acceptor.");

@@ -99,7 +99,7 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
         }
 
         messagePublisher
-                .publishMessage("[SIMULATED] Client sent 35=" + msgType + " " + pretty(message));
+                .publishMessage("Client sent 35=" + msgType + " " + pretty(message));
     }
 
     @Override
@@ -107,7 +107,7 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
 
         String msgType = message.getHeader().getString(MsgType.FIELD);
-        messagePublisher.publishMessage("[SIMULATED] Client received 35=" + msgType + " " + pretty(message));
+        messagePublisher.publishMessage("Client received 35=" + msgType + " " + pretty(message));
 
         Message expected = this.expectedInbound;
         CountDownLatch latch = this.expectedLatch;
@@ -141,13 +141,10 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
     public void onMessage(ExecutionReport report, SessionID sessionID) {
     }
 
-    /**
-     * Matching strategy:
-     * - Must match MsgType
-     * - If expected contains tags, verify those tags match in actual (11)
-     */
     private boolean matchesExpected(Message expected, Message actual) {
         try {
+            System.out.println("EXPECTED: "+expected);
+            System.out.println("ACTUAL: "+actual);
             String expType = expected.getHeader().getString(MsgType.FIELD);
             String actType = actual.getHeader().getString(MsgType.FIELD);
             if (!expType.equals(actType))
@@ -160,19 +157,19 @@ public class ClientApp extends MessageCracker implements Application, SimulatorA
 
             for (int tag : mandatoryTags) {
                 if (tag == 11) {
-                    String expectedVal11 = null;
-                    if (expected.isSetField(526)) {
-                        String val526 = expected.getString(526);
-                        expectedVal11 = val526.contains("-") ? val526.substring(val526.lastIndexOf("-") + 1) : val526;
+                    // tag 11 validation
+                    String expectedVal11 = expected.getString(11);
+                    String actualVal11 = null;
+                    if (actual.isSetField(11)) {
+                        String val11 = actual.getString(11);
+                        actualVal11 = val11.contains("-") ? val11.substring(val11.lastIndexOf("-") + 1) : val11;
                     }
-
-                    if (expectedVal11 != null) {
-                        if (!actual.isSetField(11))
-                            return false;
-                        if (!expectedVal11.equals(actual.getString(11)))
+                    if (actualVal11 != null) {
+                        if (!expectedVal11.equals(actualVal11))
                             return false;
                     }
                 } else if (expected.isSetField(tag)) {
+                    // other tags validation
                     if (!actual.isSetField(tag))
                         return false;
                     String ev = expected.getString(tag);

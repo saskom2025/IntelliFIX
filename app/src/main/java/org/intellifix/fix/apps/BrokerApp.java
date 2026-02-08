@@ -1,5 +1,6 @@
 package org.intellifix.fix.apps;
 
+import lombok.extern.slf4j.Slf4j;
 import org.intellifix.redis.base.MessagePublisher;
 import org.intellifix.fix.base.SimulatorAppBase;
 import quickfix.*;
@@ -7,6 +8,7 @@ import quickfix.field.MsgType;
 import quickfix.fix44.ExecutionReport;
 import java.util.concurrent.CountDownLatch;
 
+@Slf4j
 public class BrokerApp extends MessageCracker implements Application, SimulatorAppBase {
 
     private volatile SessionID activeSession;
@@ -78,13 +80,16 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
 
     @Override
     public void toApp(Message message, SessionID sessionID) throws DoNotSend {
+        if (message.isSetField(526)) {
+            message.removeField(526);
+        }
         String msgType = null;
         try {
             msgType = message.getHeader().getString(MsgType.FIELD);
         } catch (FieldNotFound e) {
             throw new RuntimeException(e);
         }
-        messagePublisher.publishMessage("[SIMULATED] Broker sent 35=" + msgType + " " + pretty(message));
+        messagePublisher.publishMessage("Broker sent 35=" + msgType + " " + pretty(message));
     }
 
     @Override
@@ -92,7 +97,7 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
             throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType {
 
         String msgType = message.getHeader().getString(MsgType.FIELD);
-        messagePublisher.publishMessage("[SIMULATED] Broker received 35=" + msgType + " " + pretty(message));
+        messagePublisher.publishMessage("Broker received 35=" + msgType + " " + pretty(message));
         // Try to satisfy expected inbound (D/G/F) when waiting
         Message expected = this.expectedInbound;
         CountDownLatch latch = this.expectedLatch;
@@ -101,6 +106,7 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
             if (matchesExpected(expected, message)) {
                 System.out.println("[MATCH] Expected inbound satisfied.");
                 latch.countDown();
+                this.clearExpectedInbound();
             } else {
                 System.out.println("[NO_MATCH_FOUND]");
             }
@@ -140,14 +146,10 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
     public void onMessage(ExecutionReport report, SessionID sessionID) {
     }
 
-    /**
-     * Matching strategy for inbound D/G/F:
-     * - Must match MsgType
-     * - If expected contains certain tags, enforce them
-     * (11=ClOrdID, 41=OrigClOrdID, 55, 54)
-     */
     private boolean matchesExpected(Message expected, Message actual) {
         try {
+            System.out.println("EXPECTED: " + expected);
+            System.out.println("ACTUAL: " + actual);
             String expType = expected.getHeader().getString(MsgType.FIELD);
             String actType = actual.getHeader().getString(MsgType.FIELD);
 
@@ -155,15 +157,13 @@ public class BrokerApp extends MessageCracker implements Application, SimulatorA
                 return false;
             // multiple tags can be added as comma separated values
             int[] mandatoryTags = new int[] {
-                    11, // ClOrdID
-                    55, // Symbol
-                    54 // Side
+                    526
             };
 
             for (int tag : mandatoryTags) {
                 if (expected.isSetField(tag)) {
                     String actualValue = null;
-                    if (tag == 11 && actual.isSetField(526)) {
+                    if (actual.isSetField(526)) {
                         String val526 = actual.getString(526);
                         actualValue = val526.contains("-") ? val526.substring(val526.lastIndexOf("-") + 1) : val526;
                     } else if (actual.isSetField(tag)) {
