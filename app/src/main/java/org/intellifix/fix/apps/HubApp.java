@@ -119,6 +119,6 @@ public class HubApp extends MessageCracker implements Application {
     }
 
     private String getRunningNumber() {
-        return String.valueOf(1000 + random.nextInt(9000));
+        return "%d%d".formatted(random.nextInt(1000, 10000), System.currentTimeMillis());
     }
 }
