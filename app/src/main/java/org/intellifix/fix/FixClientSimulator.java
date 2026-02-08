@@ -42,7 +42,6 @@ public final class FixClientSimulator extends SimulatorEngine {
         for (Step step : steps) {
             switch (step) {
                 case Step(StepType type, Message message) when type == StepType.OUTBOUND -> {
-                    // Filter: do not send if tag 526 is present
                     if (message.isSetField(526)) {
                         log.info("[SKIP] Message with 526=" + message.getString(526) + " ignored.");
                     } else {
@@ -55,10 +54,8 @@ public final class FixClientSimulator extends SimulatorEngine {
                     }
                 }
                 case Step(StepType type, Message message) when type == StepType.EXPECT_INBOUND -> {
-                    System.out.println("Client Simulator -> EXPECT_INBOUND");
                     CountDownLatch latch = new CountDownLatch(1);
                     app.setExpectedInbound(message, latch);
-                    // System.out.println("[WAIT] for inbound " + pretty(message));
                     boolean isResponseOk = latch.await(60, TimeUnit.SECONDS);
                     app.clearExpectedInbound();
                     if (!isResponseOk) {
@@ -104,7 +101,7 @@ public final class FixClientSimulator extends SimulatorEngine {
         if (sid == null)
             throw new RuntimeException("No active session ID");
 
-        List<Step> steps = instance.readSteps(args[2], dd);
+        List<Step> steps = instance.readSteps(args[2], dd, sid);
         instance.runScenario(steps, app, sid);
 
         log.info("[DONE] Scenario completed. Stopping initiator.");

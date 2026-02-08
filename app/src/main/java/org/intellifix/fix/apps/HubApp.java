@@ -5,11 +5,12 @@ import org.intellifix.redis.base.MessagePublisher;
 import quickfix.*;
 import quickfix.field.MsgType;
 
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 public class HubApp extends MessageCracker implements Application {
-
     private volatile SessionID clientSession;
     private volatile SessionID brokerSession;
 
@@ -17,6 +18,7 @@ public class HubApp extends MessageCracker implements Application {
     private final String clientCompID;
     private final String brokerCompID;
     private final Random random = new Random();
+    private final Map<String, String> clOrdIDMap = new ConcurrentHashMap<>();
 
     public HubApp(MessagePublisher messagePublisher, String clientCompID, String brokerCompID) {
         this.messagePublisher = messagePublisher;
@@ -76,10 +78,11 @@ public class HubApp extends MessageCracker implements Application {
         if (sessionID.equals(clientSession)) {
             if (brokerSession != null) {
                 log.info("[HUB] Forwarding to Broker...session:" + brokerSession);
-                String tag526 = message.getString(11);
-
-                message.setString(526, tag526);
-                message.setString(11, getRunningNumber()); // tag11 will be a random 4-digit number from hub
+                String tag11 = message.getString(11);
+                message.setString(526, tag11);
+                String newTag11 = getRunningNumber();
+                clOrdIDMap.put(newTag11, tag11);
+                message.setString(11, newTag11);
                 forward(message, brokerSession);
             } else {
                 log.info("[HUB] WARN: Broker session not logged on. Cannot forward.");
@@ -87,16 +90,10 @@ public class HubApp extends MessageCracker implements Application {
         } else if (sessionID.equals(brokerSession)) {
             if (clientSession != null) {
                 log.info("[HUB] Forwarding to Client...session: " + clientSession);
-
-                if (message.isSetField(526)) {
-                    String originalWithPrefix = message.getString(526);
-                    String originalClOrdID = originalWithPrefix;
-                    if (originalWithPrefix.contains("-")) {
-                        originalClOrdID = originalWithPrefix.substring(originalWithPrefix.lastIndexOf("-") + 1);
-                    }
-                    message.setString(11, originalClOrdID);
-                    message.removeField(526);
-                    log.info("[HUB] Restored tag 11 to " + originalClOrdID + " and removed tag 526");
+                if (message.isSetField(11)) {
+                    String simulatedClOrdID = clOrdIDMap.get(message.getString(11));
+                    message.setString(11, simulatedClOrdID);
+                    log.info("[HUB] Restored tag 11 to " + simulatedClOrdID);
                 }
                 forward(message, clientSession);
             } else {
