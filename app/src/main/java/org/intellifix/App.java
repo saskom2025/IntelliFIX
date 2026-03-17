@@ -14,7 +14,7 @@ public class App {
     private static final String CONSUMER_NAME = "consumer_1";
 
     public static void main(String[] args) {
-        System.out.println("#### Main method ####");
+
         String redisUri = "localhost";
 
         try (JedisPooled jedis = new JedisPooled(redisUri)) {

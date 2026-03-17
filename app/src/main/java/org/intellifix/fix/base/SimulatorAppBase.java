@@ -12,4 +12,6 @@ public interface SimulatorAppBase {
     void clearExpectedInbound();
 
     SessionID getActiveSession();
+
+    Message updateTagEleven(Message message, String simId, String senderCompId, String tag);
 }
